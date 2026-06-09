@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Bingo</title>
+</head>
+
+<body>
+
+    <div id="board" class="board"></div>
+
+    <div id="typing-indicator" class="typing-indicator"></div>
+
+    <script>
+        const board = document.getElementById('board');
+        const typingIndicator = document.getElementById('typing-indicator');
+        let currentTyping = '';
+
+        // Carrega os números que já foram virados salvos no localStorage
+        let flippedNumbers = JSON.parse(localStorage.getItem('bingoFlippedNumbers')) || [];
+
+        // Gera as 75 cartas do bingo dinamicamente
+        for (let i = 1; i <= 75; i++) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.id = `card-${i}`;
+
+            // Se o número já estiver no localStorage, mantém ele virado
+            if (flippedNumbers.includes(i)) {
+                card.classList.add('flipped');
+            }
+
+            const cardInner = document.createElement('div');
+            cardInner.className = 'card-inner';
+
+            // Frente da carta (Oculta)
+            const cardFront = document.createElement('div');
+            cardFront.className = 'card-front';
+
+            // Verso da carta (Exposta com o número)
+            const cardBack = document.createElement('div');
+            cardBack.className = 'card-back';
+            cardBack.innerText = i;
+
+            cardInner.appendChild(cardFront);
+            cardInner.appendChild(cardBack);
+            card.appendChild(cardInner);
+
+            // Evento de clique para ocultar uma carta que já saiu (Verificação de duas etapas)
+            card.addEventListener('click', () => {
+                if (card.classList.contains('flipped')) {
+                    // Primeira etapa de verificação
+                    const primeiraEtapa = confirm(`Você deseja ocultar o número ${i} novamente?`);
+
+                    if (primeiraEtapa) {
+                        // Segunda etapa de verificação
+                        const segundaEtapa = confirm(`Tem certeza absoluta? O número ${i} voltará a ficar oculto no painel.`);
+
+                        if (segundaEtapa) {
+                            card.classList.remove('flipped');
+                            // Remove o número da lista de virados e atualiza o localStorage
+                            flippedNumbers = flippedNumbers.filter(num => num !== i);
+                            localStorage.setItem('bingoFlippedNumbers', JSON.stringify(flippedNumbers));
+                        }
+                    }
+                }
+            });
+
+            board.appendChild(card);
+        }
+
+        // Monitora a digitação do usuário na tela
+        document.addEventListener('keydown', (e) => {
+            // Se for um número de 0 a 9
+            if (e.key >= '0' && e.key <= '9') {
+                if (currentTyping.length < 3) { // Permite até 3 dígitos para aceitar o 999
+                    currentTyping += e.key;
+                    updateIndicator();
+                }
+            }
+            // Apagar o último número digitado
+            else if (e.key === 'Backspace') {
+                currentTyping = currentTyping.slice(0, -1);
+                updateIndicator();
+            }
+            // Confirmar o número (Enter)
+            else if (e.key === 'Enter' || e.key === 'NumpadEnter') {
+                const num = parseInt(currentTyping, 10);
+
+                // Lógica para reiniciar tudo se digitar 999
+                if (num === 999) {
+                    if (confirm("Deseja reiniciar o bingo e esconder TODOS os 75 números?")) {
+                        resetBingo();
+                    }
+                }
+                // Valida se o número existe no bingo (1 a 75)
+                else if (num >= 1 && num <= 75) {
+                    flipCard(num);
+                }
+
+                // Limpa a digitação após o Enter
+                currentTyping = '';
+                updateIndicator();
+            }
+            // Cancelar a digitação
+            else if (e.key === 'Escape') {
+                currentTyping = '';
+                updateIndicator();
+            }
+        });
+
+        // Atualiza a interface do pequeno número no canto inferior direito
+        function updateIndicator() {
+            typingIndicator.innerText = currentTyping;
+            if (currentTyping.length > 0) {
+                typingIndicator.style.display = 'block';
+            } else {
+                typingIndicator.style.display = 'none';
+            }
+        }
+
+        // Executa a animação de virar a carta e salva no localStorage
+        function flipCard(num) {
+            const card = document.getElementById(`card-${num}`);
+            if (card && !card.classList.contains('flipped')) {
+                card.classList.add('flipped');
+
+                // Adiciona o número na lista caso não esteja lá e salva
+                if (!flippedNumbers.includes(num)) {
+                    flippedNumbers.push(num);
+                    localStorage.setItem('bingoFlippedNumbers', JSON.stringify(flippedNumbers));
+                }
+            }
+        }
+
+        // Função que limpa o localStorage e desvira todas as cartas
+        function resetBingo() {
+            flippedNumbers = [];
+            localStorage.removeItem('bingoFlippedNumbers');
+            document.querySelectorAll('.card').forEach(card => {
+                card.classList.remove('flipped');
+            });
+        }
+    </script>
+</body>
+
+<style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        background-color: #121212;
+        font-family: Arial, sans-serif;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        user-select: none;
+    }
+
+    /* Mudança para 10 colunas e 8 linhas. 
+  Isso alinha as dezenas nas colunas e deixa o formato da carta mais retangular (horizontal).
+*/
+    .board {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        grid-template-rows: repeat(8, 1fr);
+        height: 100vh;
+        width: 100vw;
+        gap: 6px;
+        padding: 6px;
+    }
+
+    /* Responsividade: Se a tela for em pé, ele ajusta para 5 colunas x 15 linhas para não quebrar */
+    @media (max-aspect-ratio: 1/1) {
+        .board {
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+        }
+    }
+
+    .card {
+        perspective: 1000px;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+    }
+
+    .card-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        text-align: center;
+        transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+        transform-style: preserve-3d;
+    }
+
+    .card.flipped .card-inner {
+        transform: rotateY(180deg);
+    }
+
+    .card-front,
+    .card-back {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        font-weight: bold;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Visual da carta oculta (Frente) */
+    .card-front {
+        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .card-front::after {
+        content: '?';
+        color: rgba(255, 255, 255, 0.3);
+        font-size: 3vmin;
+        /* Tamanho da interrogação */
+    }
+
+    /* Visual da carta exposta com o número (Verso) - Agora Branca e com Número Maior */
+    .card-back {
+        background: #ffffff;
+        /* Fundo branco */
+        color: #121212;
+        /* Cor do número escura para contrastar */
+        transform: rotateY(180deg);
+        border: 2px solid #ccc;
+        font-size: 7.5vmin;
+        /* Fonte consideravelmente maior */
+    }
+
+    .typing-indicator {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: #e74c3c;
+        color: #fff;
+        padding: 10px 25px;
+        border-radius: 8px;
+        font-size: 28px;
+        font-weight: bold;
+        display: none;
+        z-index: 1000;
+        border: 3px solid #fff;
+        box-shadow: 0 0 15px rgba(231, 76, 60, 0.6);
+        min-width: 70px;
+        text-align: center;
+    }
+</style>
+
+</html>
